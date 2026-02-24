@@ -1,6 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
+import pool from '../db.js';
+import { logActivity } from './activityLog.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'tipri-secret-key-2024';
@@ -121,6 +123,15 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
       [user_id, account_id, can_view !== false, can_transact || false]
     );
 
+    // Get user and account names for logging
+    const userResult = await query('SELECT full_name FROM users WHERE id = $1', [user_id]);
+    const accountResult = await query('SELECT name FROM accounts WHERE id = $1', [account_id]);
+    const userName = userResult.rows[0]?.full_name || 'Unknown';
+    const accountName = accountResult.rows[0]?.name || 'Unknown';
+
+    // Log activity
+    await logActivity(pool, req.user.id, 'Grant Access', `Granted access to account "${accountName}" for user "${userName}"`, 'account_access', result.rows[0].id);
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating account access:', error);
@@ -172,7 +183,17 @@ router.delete('/:id', authenticate, isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Account access not found' });
     }
 
+    // Get user and account names for logging before deletion
+    const accessData = existingAccess.rows[0];
+    const userResult = await query('SELECT full_name FROM users WHERE id = $1', [accessData.user_id]);
+    const accountResult = await query('SELECT name FROM accounts WHERE id = $1', [accessData.account_id]);
+    const userName = userResult.rows[0]?.full_name || 'Unknown';
+    const accountName = accountResult.rows[0]?.name || 'Unknown';
+
     await query('DELETE FROM account_access WHERE id = $1', [id]);
+
+    // Log activity
+    await logActivity(pool, req.user.id, 'Remove Access', `Removed access to account "${accountName}" from user "${userName}"`, 'account_access', parseInt(id));
 
     res.json({ message: 'Account access removed successfully' });
   } catch (error) {

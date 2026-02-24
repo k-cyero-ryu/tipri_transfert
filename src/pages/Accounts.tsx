@@ -13,6 +13,16 @@ const Accounts = ({ user }: AccountsProps) => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawingAccount, setWithdrawingAccount] = useState<Account | null>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawDescription, setWithdrawDescription] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [accessingAccount, setAccessingAccount] = useState<Account | null>(null);
+  const [accountUsers, setAccountUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [accessLoading, setAccessLoading] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferForm, setTransferForm] = useState({
@@ -22,7 +32,14 @@ const Accounts = ({ user }: AccountsProps) => {
     receive_amount: 0,
   });
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    type: string;
+    detail: string;
+    currency: 'USD' | 'HTG';
+    balance: number;
+    is_active: boolean;
+  }>({
     name: '',
     type: 'Cash',
     detail: '',
@@ -115,6 +132,98 @@ const Accounts = ({ user }: AccountsProps) => {
     }
   };
 
+  const openWithdrawModal = (account: Account) => {
+    setWithdrawingAccount(account);
+    setWithdrawAmount('');
+    setWithdrawDescription('');
+    setShowWithdrawModal(true);
+  };
+
+  const handleWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawingAccount || !withdrawAmount) return;
+    
+    if (!window.confirm(t('confirm') + '?')) {
+      return;
+    }
+    
+    setWithdrawLoading(true);
+    try {
+      const result = await api.withdrawFromAccount(withdrawingAccount.id, {
+        amount: parseFloat(withdrawAmount),
+        description: withdrawDescription,
+      });
+      
+      alert(result.message);
+      setShowWithdrawModal(false);
+      setWithdrawingAccount(null);
+      loadAccounts();
+    } catch (error: any) {
+      alert(error.message || 'Withdrawal failed');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  const openAccessModal = async (account: Account) => {
+    setAccessingAccount(account);
+    setShowAccessModal(true);
+    try {
+      // Load all users
+      const users = await api.getUsers();
+      setAllUsers(users);
+      
+      // Load users with access to this account
+      const accessData = await (await fetch(`/api/account-access/account/${account.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })).json();
+      setAccountUsers(accessData);
+    } catch (error) {
+      console.error('Error loading access data:', error);
+    }
+  };
+
+  const handleAddAccess = async (userId: number) => {
+    if (!accessingAccount) return;
+    setAccessLoading(true);
+    try {
+      await api.createAccountAccess({
+        user_id: userId,
+        account_id: accessingAccount.id,
+        can_view: true,
+        can_transact: true,
+      });
+      // Refresh access data
+      const accessData = await (await fetch(`/api/account-access/account/${accessingAccount.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })).json();
+      setAccountUsers(accessData);
+    } catch (error: any) {
+      alert(error.message || 'Failed to add access');
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  const handleRemoveAccess = async (accessId: number) => {
+    if (!window.confirm(t('confirm') + '?')) return;
+    setAccessLoading(true);
+    try {
+      await api.deleteAccountAccess(accessId);
+      // Refresh access data
+      if (accessingAccount) {
+        const accessData = await (await fetch(`/api/account-access/account/${accessingAccount.id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })).json();
+        setAccountUsers(accessData);
+      }
+    } catch (error: any) {
+      alert(error.message || 'Failed to remove access');
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
@@ -179,6 +288,12 @@ const Accounts = ({ user }: AccountsProps) => {
                       <td className="table-actions">
                         <button className="btn btn-outline btn-sm" onClick={() => { setEditingAccount(account); setFormData({ name: account.name, type: account.type, detail: account.detail || '', currency: account.currency, balance: typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance, is_active: account.is_active }); setShowModal(true); }}>
                           {t('edit')}
+                        </button>
+                        <button className="btn btn-warning btn-sm" onClick={() => openWithdrawModal(account)}>
+                          {t('withdraw')}
+                        </button>
+                        <button className="btn btn-info btn-sm" onClick={() => openAccessModal(account)}>
+                          {t('grantAccess')}
                         </button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(account.id)}>
                           {t('delete')}
@@ -282,6 +397,135 @@ const Accounts = ({ user }: AccountsProps) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showWithdrawModal && withdrawingAccount && (
+        <div className="modal-overlay" onClick={() => setShowWithdrawModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">{t('withdraw')}</h2>
+              <button className="modal-close" onClick={() => setShowWithdrawModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleWithdraw}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">{t('accountName')}</label>
+                  <input type="text" className="form-input" value={withdrawingAccount.name} disabled />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{t('currentBalance')}</label>
+                  <input type="text" className="form-input" value={formatCurrency(withdrawingAccount.balance)} disabled />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{t('amount')}</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={withdrawAmount} 
+                    onChange={(e) => setWithdrawAmount(e.target.value)} 
+                    min="0.01"
+                    step="0.01"
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{t('transactionDetails')}</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={withdrawDescription} 
+                    onChange={(e) => setWithdrawDescription(e.target.value)} 
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowWithdrawModal(false)}>{t('cancel')}</button>
+                <button type="submit" className="btn btn-warning" disabled={withdrawLoading}>
+                  {withdrawLoading ? t('loading') : t('withdraw')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAccessModal && accessingAccount && (
+        <div className="modal-overlay" onClick={() => setShowAccessModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">{t('accountAccess')}</h2>
+              <button className="modal-close" onClick={() => setShowAccessModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p><strong>{t('accountName')}:</strong> {accessingAccount.name}</p>
+              
+              <div className="form-group" style={{ marginTop: '15px' }}>
+                <label className="form-label">{t('addUser') || 'Add User'}</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <select id="userSelect" className="form-select" style={{ flex: 1 }}>
+                    <option value="">-- Select User --</option>
+                    {allUsers
+                      .filter(u => !accountUsers.some(au => au.user_id === u.id))
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                      ))
+                    }
+                  </select>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      const select = document.getElementById('userSelect') as HTMLSelectElement;
+                      if (select.value) handleAddAccess(parseInt(select.value));
+                    }}
+                    disabled={accessLoading}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '20px' }}>
+                <label className="form-label">{t('usersWithAccess') || 'Users with Access'}</label>
+                {accountUsers.length === 0 ? (
+                  <p style={{ color: '#666' }}>{t('noData')}</p>
+                ) : (
+                  <table className="table" style={{ marginTop: '10px' }}>
+                    <thead>
+                      <tr>
+                        <th>{t('fullName')}</th>
+                        <th>{t('userRole')}</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accountUsers.map(au => (
+                        <tr key={au.id}>
+                          <td>{au.full_name}</td>
+                          <td>{au.role}</td>
+                          <td>
+                            <button 
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleRemoveAccess(au.id)}
+                              disabled={accessLoading}
+                            >
+                              {t('remove') || 'Remove'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowAccessModal(false)}>
+                {t('close') || 'Close'}
+              </button>
+            </div>
           </div>
         </div>
       )}

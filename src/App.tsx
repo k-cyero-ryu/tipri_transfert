@@ -12,6 +12,8 @@ import Accounts from './pages/Accounts';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Clients from './pages/Clients';
+import ActivityLog from './pages/ActivityLog';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -75,9 +77,13 @@ function App() {
                 <Route path="/" element={<Dashboard user={user} />} />
                 <Route path="/transactions" element={<Transactions user={user} />} />
                 <Route path="/accounts" element={<Accounts user={user} />} />
+                <Route path="/clients" element={<Clients user={user} />} />
                 <Route path="/users" element={<Users user={user} />} />
                 <Route path="/reports" element={<Reports user={user} />} />
                 <Route path="/settings" element={<Settings user={user} />} />
+                {user.role === 'admin' && (
+                  <Route path="/activity-log" element={<ActivityLog user={user} />} />
+                )}
               </Routes>
             </main>
           </div>

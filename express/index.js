@@ -11,6 +11,8 @@ import settingsRoutes from './routes/settings.js';
 import dashboardRoutes from './routes/dashboard.js';
 import accountAccessRoutes from './routes/accountAccess.js';
 import accountTransferRoutes from './routes/accountTransfer.js';
+import clientRoutes from './routes/clients.js';
+import activityLogRoutes from './routes/activityLog.js';
 
 dotenv.config();
 
@@ -31,6 +33,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/account-transfer', accountTransferRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/activity-log', activityLogRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

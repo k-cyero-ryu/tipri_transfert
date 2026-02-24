@@ -1,6 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
+import pool from '../db.js';
+import { logActivity } from './activityLog.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'tipri-secret-key-2024';
@@ -108,6 +110,9 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
       [name, type, detail || '', currency, balance || 0]
     );
 
+    // Log activity
+    await logActivity(pool, req.user.id, 'Create Account', `Created account: ${name} (${type}, ${currency})`, 'account', result.rows[0].id);
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating account:', error);
@@ -138,6 +143,9 @@ router.put('/:id', authenticate, isAdmin, async (req, res) => {
       [name, type, detail, currency, is_active, balance, id]
     );
 
+    // Log activity
+    await logActivity(pool, req.user.id, 'Update Account', `Updated account: ${name} (active: ${is_active})`, 'account', parseInt(id));
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating account:', error);
@@ -159,14 +167,97 @@ router.delete('/:id', authenticate, isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
+    const accountName = existingAccount.rows[0].name;
+
     await query(
       'UPDATE accounts SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [id]
     );
 
+    // Log activity
+    await logActivity(pool, req.user.id, 'Delete Account', `Deactivated account: ${accountName}`, 'account', parseInt(id));
+
     res.json({ message: 'Account deactivated successfully' });
   } catch (error) {
     console.error('Error deleting account:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Withdraw from account
+router.post('/:id/withdraw', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, description } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    // Check if account exists
+    const account = await query(
+      'SELECT * FROM accounts WHERE id = $1 AND is_active = true',
+      [id]
+    );
+
+    if (account.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found or inactive' });
+    }
+
+    const accountData = account.rows[0];
+    const currentBalance = parseFloat(accountData.balance);
+    const withdrawAmount = parseFloat(amount);
+
+    // Check if sufficient balance
+    if (currentBalance < withdrawAmount) {
+      return res.status(400).json({ 
+        error: 'Insufficient balance',
+        current_balance: currentBalance,
+        requested_amount: withdrawAmount
+      });
+    }
+
+    const newBalance = currentBalance - withdrawAmount;
+
+    // Get pool and create transaction
+    const pool = (await import('../db.js')).default;
+    const clientConn = await pool.connect();
+
+    try {
+      await clientConn.query('BEGIN');
+
+      // Update account balance
+      await clientConn.query(
+        'UPDATE accounts SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [newBalance, id]
+      );
+
+      // Record the transaction
+      await clientConn.query(
+        `INSERT INTO account_transactions (account_id, type, amount, balance_before, balance_after, description)
+         VALUES ($1, 'debit', $2, $3, $4, $5)`,
+        [id, withdrawAmount, currentBalance, newBalance, description ? `Withraw - ${description}` : 'Withraw']
+      );
+
+      await clientConn.query('COMMIT');
+
+      // Log activity (outside transaction since we need the pool)
+      await logActivity(pool, req.user.id, 'Withdraw', `Withdrew $${withdrawAmount} from account ${accountData.name}`, 'account', parseInt(id));
+    } catch (error) {
+      await clientConn.query('ROLLBACK');
+      throw error;
+    } finally {
+      clientConn.release();
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Withdrawal of $${withdrawAmount.toFixed(2)} from ${accountData.name}`,
+      new_balance: newBalance,
+      amount_withdrawn: withdrawAmount
+    });
+  } catch (error) {
+    console.error('Error withdrawing from account:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

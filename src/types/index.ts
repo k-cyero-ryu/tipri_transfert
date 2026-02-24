@@ -48,8 +48,8 @@ export interface Transaction {
   is_credit: boolean;
   credit_due_date?: string;
   credit_paid: boolean;
-  sender_account_id?: number;
-  receiver_account_id?: number;
+  sender_account_id?: number | null;
+  receiver_account_id?: number | null;
   created_by: number;
   created_at?: string;
   updated_at?: string;
@@ -92,6 +92,16 @@ export interface DashboardSummary {
   pendingPayments?: {
     count: number;
   };
+}
+
+export interface Client {
+  id: number;
+  name: string;
+  credit_limit: number;
+  current_balance: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LoginResponse {

@@ -1,4 +1,4 @@
-import { User, Account, Transaction, AccountAccess, Settings, DashboardSummary, LoginResponse } from '../types';
+import { User, Account, Transaction, AccountAccess, Settings, DashboardSummary, LoginResponse, Client } from '../types';
 
 const API_URL = '/api';
 
@@ -105,6 +105,19 @@ export const deleteAccount = async (id: number): Promise<void> => {
     headers: headers(),
   });
   if (!res.ok) throw new Error('Failed to delete account');
+};
+
+export const withdrawFromAccount = async (id: number, data: { amount: number; description?: string }): Promise<{ success: boolean; message: string; new_balance: number; amount_withdrawn: number }> => {
+  const res = await fetch(`${API_URL}/accounts/${id}/withdraw`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to withdraw');
+  }
+  return res.json();
 };
 
 export const getAccountTransactions = async (id: number, params?: { startDate?: string; endDate?: string; status?: string }): Promise<Transaction[]> => {
@@ -236,13 +249,69 @@ export const getCreditReport = async (params?: { currency?: string }) => {
   return res.json();
 };
 
-export const getProfitReport = async (params?: { startDate?: string; endDate?: string }) => {
+export const getProfitReport = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
   const queryParams = new URLSearchParams();
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
   
   const res = await fetch(`${API_URL}/reports/profit?${queryParams}`, { headers: headers() });
   if (!res.ok) throw new Error('Failed to fetch report');
+  return res.json();
+};
+
+export const getProfitTransactions = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
+  
+  const res = await fetch(`${API_URL}/reports/profit/transactions?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch transactions');
+  return res.json();
+};
+
+export const getCostReport = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
+  
+  const res = await fetch(`${API_URL}/reports/cost?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch report');
+  return res.json();
+};
+
+export const getCostTransactions = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
+  
+  const res = await fetch(`${API_URL}/reports/cost/transactions?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch transactions');
+  return res.json();
+};
+
+export const getWithdrawalsReport = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
+  
+  const res = await fetch(`${API_URL}/reports/withdrawals?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch report');
+  return res.json();
+};
+
+export const getWithdrawalsTransactions = async (params?: { startDate?: string; endDate?: string; currency?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.currency) queryParams.append('currency', params.currency);
+  
+  const res = await fetch(`${API_URL}/reports/withdrawals/transactions?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch transactions');
   return res.json();
 };
 
@@ -292,5 +361,82 @@ export const transferAccounts = async (data: { from_account_id: number; to_accou
     const error = await res.json();
     throw new Error(error.error || 'Failed to transfer');
   }
+  return res.json();
+};
+
+// Clients
+export const getClients = async (): Promise<Client[]> => {
+  const res = await fetch(`${API_URL}/clients`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch clients');
+  return res.json();
+};
+
+export const createClient = async (data: { name: string; credit_limit: number }): Promise<Client> => {
+  const res = await fetch(`${API_URL}/clients`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to create client');
+  }
+  return res.json();
+};
+
+export const updateClient = async (id: number, data: Partial<Client>): Promise<Client> => {
+  const res = await fetch(`${API_URL}/clients/${id}`, {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update client');
+  return res.json();
+};
+
+export const deleteClient = async (id: number): Promise<void> => {
+  const res = await fetch(`${API_URL}/clients/${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error('Failed to delete client');
+};
+
+export const liquidateClient = async (id: number, accountId: number): Promise<{ success: boolean; message: string; liquidated_count: number }> => {
+  const res = await fetch(`${API_URL}/clients/${id}/liquidate`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ account_id: accountId }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to liquidate client');
+  }
+  return res.json();
+};
+
+// Activity Log
+export interface ActivityLogEntry {
+  id: number;
+  user_id: number;
+  action: string;
+  details: string;
+  entity_type: string | null;
+  entity_id: number | null;
+  created_at: string;
+  username?: string;
+  full_name?: string;
+  role?: string;
+}
+
+export const getActivityLogs = async (params?: { startDate?: string; endDate?: string; action?: string; userId?: string }): Promise<ActivityLogEntry[]> => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.action) queryParams.append('action', params.action);
+  if (params?.userId) queryParams.append('userId', params.userId);
+  
+  const res = await fetch(`${API_URL}/activity-log?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch activity logs');
   return res.json();
 };

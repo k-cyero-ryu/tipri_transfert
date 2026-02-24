@@ -1,6 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
+import pool from '../db.js';
+import { logActivity } from './activityLog.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'tipri-secret-key-2024';
@@ -77,7 +79,19 @@ router.post('/transfer', authenticate, async (req, res) => {
         VALUES ($1, 'credit', $2, $3, $4, $5)
       `, [to_account_id, receive_amount, toAccount.rows[0].balance, newToBalance, 'Received from another account']);
 
+      // Record the transfer in account_transfer table
+      const transferResult = await client.query(`
+        INSERT INTO account_transfer (from_account_id, to_account_id, from_currency, to_currency, send_amount, receive_amount, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, 'completed', $7)
+        RETURNING id
+      `, [from_account_id, to_account_id, fromAccount.rows[0].currency, toAccount.rows[0].currency, send_amount, receive_amount, req.user.id]);
+
       await client.query('COMMIT');
+
+      // Log activity
+      await logActivity(pool, req.user.id, 'Account Transfer', 
+        `Transferred ${send_amount} ${fromAccount.rows[0].currency} to ${receive_amount} ${toAccount.rows[0].currency} (cost: ${send_amount - receive_amount})`, 
+        'account_transfer', transferResult.rows[0].id);
 
       res.json({ 
         success: true, 

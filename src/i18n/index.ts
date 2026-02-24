@@ -40,6 +40,7 @@ const resources = {
       users: 'Users',
       reports: 'Reports',
       settings: 'Settings',
+      clients: 'Clients',
       
       // Dashboard
       totalBalance: 'Total Balance',
@@ -62,6 +63,20 @@ const resources = {
       editAccount: 'Edit Account',
       accountAccess: 'Account Access',
       grantAccess: 'Grant Access',
+      withdraw: 'Withdraw',
+      amount: 'Amount',
+      addUser: 'Add User',
+      usersWithAccess: 'Users with Access',
+      remove: 'Remove',
+      close: 'Close',
+      
+      // Activity Log
+      activityLog: 'Activity Log',
+      dateTime: 'Date & Time',
+      action: 'Action',
+      details: 'Details',
+      entity: 'Entity',
+      user: 'User',
       
       // Transactions
       clientName: 'Client Name',
@@ -96,6 +111,11 @@ const resources = {
       transferredReport: 'Money Transferred',
       creditReport: 'Unpaid Credit',
       profitReport: 'Profit',
+      costReport: 'Cost',
+      withdrawalsReport: 'Withdrawals',
+      resumeReport: 'Resume',
+      summary: 'Summary',
+      transactionsReport: 'Transactions',
       dateRange: 'Date Range',
       startDate: 'Start Date',
       endDate: 'End Date',
@@ -127,6 +147,17 @@ const resources = {
       natcash: 'NatCash',
       credit: 'Credit',
       transfer: 'Transfer',
+      
+      // Clients
+      creditLimit: 'Credit Limit',
+      currentBalance: 'Current Balance',
+      createClient: 'Create Client',
+      editClient: 'Edit Client',
+      liquidate: 'Liquidate',
+      liquidateDebt: 'Liquidate Debt',
+      liquidateConfirm: 'Are you sure you want to liquidate this client\'s debt?',
+      debtLiquidated: 'Debt has been liquidated successfully',
+      noDebtToLiquidate: 'No unpaid debt to liquidate',
     }
   },
   fr: {
@@ -167,6 +198,7 @@ const resources = {
       users: 'Utilisateurs',
       reports: 'Rapports',
       settings: 'Paramètres',
+      clients: 'Clients',
       
       // Dashboard
       totalBalance: 'Solde Total',
@@ -189,6 +221,20 @@ const resources = {
       editAccount: 'Modifier le compte',
       accountAccess: 'Accès au compte',
       grantAccess: "Accorder l'accès",
+      withdraw: 'Retirer',
+      amount: 'Montant',
+      addUser: 'Ajouter utilisateur',
+      usersWithAccess: 'Utilisateurs avec accès',
+      remove: 'Retirer',
+      close: 'Fermer',
+      
+      // Activity Log
+      activityLog: 'Journal d\'activité',
+      dateTime: 'Date et heure',
+      action: 'Action',
+      details: 'Détails',
+      entity: 'Entité',
+      user: 'Utilisateur',
       
       // Transactions
       clientName: 'Nom du client',
@@ -224,6 +270,11 @@ const resources = {
       transferredReport: 'Argent transféré',
       creditReport: 'Crédit impayé',
       profitReport: 'Profit',
+      costReport: 'Coût',
+      withdrawalsReport: 'Retraits',
+      resumeReport: 'Résumé',
+      summary: 'Résumé',
+      transactionsReport: 'Transactions',
       dateRange: 'Période',
       startDate: 'Date de début',
       endDate: 'Date de fin',
@@ -255,6 +306,17 @@ const resources = {
       natcash: 'NatCash',
       credit: 'Crédit',
       transfer: 'Transfert',
+      
+      // Clients
+      creditLimit: 'Limite de crédit',
+      currentBalance: 'Solde actuel',
+      createClient: 'Créer un client',
+      editClient: 'Modifier le client',
+      liquidate: 'Liquider',
+      liquidateDebt: 'Liquider la dette',
+      liquidateConfirm: 'Êtes-vous sûr de vouloir liquider la dette de ce client?',
+      debtLiquidated: 'La dette a été liquidée avec succès',
+      noDebtToLiquidate: 'Aucune dette impayée à liquider',
     }
   }
 };

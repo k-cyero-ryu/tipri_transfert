@@ -1,6 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
+import pool from '../db.js';
+import { logActivity } from './activityLog.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'tipri-secret-key-2024';
@@ -169,6 +171,47 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Required fields are missing' });
     }
 
+    // If it's a credit transaction, check if client has enough remaining credit
+    if (is_credit) {
+      console.log('Checking credit for client:', client_name, 'is_credit:', is_credit);
+      
+      const clientResult = await query(
+        `SELECT c.*, 
+          COALESCE(
+            (SELECT SUM(t.transaction_amount) 
+             FROM transactions t 
+             WHERE t.client_name = c.name 
+             AND t.is_credit = true 
+             AND t.credit_paid = false), 0
+          ) as current_balance
+         FROM clients c 
+         WHERE c.name = $1 AND c.is_active = true`,
+        [client_name]
+      );
+
+      console.log('Client result:', clientResult.rows);
+
+      if (clientResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Client not found or inactive. Please create the client first in the Clients page.' });
+      }
+
+      const client = clientResult.rows[0];
+      const currentBalance = parseFloat(client.current_balance || 0);
+      const creditLimit = parseFloat(client.credit_limit || 0);
+      const remainingCredit = creditLimit - currentBalance;
+      const paymentAmount = parseFloat(payment_amount);
+
+      console.log('Credit check:', { currentBalance, creditLimit, remainingCredit, paymentAmount });
+
+      if (remainingCredit < paymentAmount) {
+        return res.status(400).json({ 
+          error: 'Insufficient credit remaining',
+          remaining_credit: remainingCredit,
+          requested_amount: paymentAmount
+        });
+      }
+    }
+
     // Get default tax rate from settings if not provided
     let finalTaxRate = tax_rate;
     if (!finalTaxRate) {
@@ -188,6 +231,35 @@ router.post('/', authenticate, async (req, res) => {
       transaction_method, transaction_details || '', finalTaxRate, is_credit || false,
       credit_due_date || null, sender_account_id || null, receiver_account_id || null, req.user.id
     ]);
+
+    // If it's a credit transaction, create a credit notification
+    if (is_credit) {
+      const newTransaction = result.rows[0];
+      
+      // Get credit notification days from settings
+      const notifyDaysResult = await query("SELECT value FROM settings WHERE key = 'credit_notification_days'");
+      const notifyDays = notifyDaysResult.rows.length > 0 ? parseInt(notifyDaysResult.rows[0].value) : 7;
+      
+      // Calculate days until due
+      let daysUntilDue = 0;
+      if (credit_due_date) {
+        const dueDate = new Date(credit_due_date);
+        const today = new Date();
+        daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      }
+      
+      // Create credit notification
+      await query(
+        'INSERT INTO credit_notifications (transaction_id, days_overdue) VALUES ($1, $2)',
+        [newTransaction.id, daysUntilDue > 0 ? -daysUntilDue : 0] // Negative days means days until due
+      );
+    }
+
+    // Log activity
+    const newTx = result.rows[0];
+    await logActivity(pool, req.user.id, 'Create Transaction', 
+      `Created transaction #${newTx.id}: ${client_name} - ${payment_method} $${payment_amount} → ${transaction_method} $${transaction_amount}` + (is_credit ? ' (Credit)' : ''), 
+      'transaction', newTx.id);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -315,6 +387,9 @@ router.put('/:id/confirm-payment', authenticate, async (req, res) => {
         WHERE t.id = $1
       `, [id]);
 
+      // Log activity
+      await logActivity(pool, req.user.id, 'Confirm Payment', `Confirmed payment for transaction #${id}: ${transaction.client_name}`, 'transaction', parseInt(id));
+
       res.json(result.rows[0]);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -419,6 +494,9 @@ router.put('/:id/execute', authenticate, async (req, res) => {
           WHERE t.id = $1
         `, [id]);
 
+        // Log activity
+        await logActivity(pool, req.user.id, 'Execute Transaction', `Executed transaction #${id}: ${transaction.client_name} - $${debitAmount} debited`, 'transaction', parseInt(id));
+
         res.json(result.rows[0]);
       } catch (error) {
         await client.query('ROLLBACK');
@@ -444,6 +522,9 @@ router.put('/:id/execute', authenticate, async (req, res) => {
         LEFT JOIN users u ON t.created_by = u.id
         WHERE t.id = $1
       `, [id]);
+
+      // Log activity
+      await logActivity(pool, req.user.id, 'Execute Transaction', `Executed transaction #${id}: ${transaction.client_name}`, 'transaction', parseInt(id));
 
       res.json(result.rows[0]);
     }
@@ -480,6 +561,9 @@ router.put('/:id/cancel', authenticate, async (req, res) => {
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1 RETURNING *
     `, [id]);
+
+    // Log activity
+    await logActivity(pool, req.user.id, 'Cancel Transaction', `Canceled transaction #${id}: ${transaction.client_name}`, 'transaction', parseInt(id));
 
     res.json(result.rows[0]);
   } catch (error) {

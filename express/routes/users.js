@@ -2,6 +2,8 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
+import pool from '../db.js';
+import { logActivity } from './activityLog.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'tipri-secret-key-2024';
@@ -91,6 +93,9 @@ router.post('/', isAdmin, async (req, res) => {
       [username, hashedPassword, full_name, role]
     );
 
+    // Log activity
+    await logActivity(pool, req.user.id, 'Create User', `Created user: ${username} (${role})`, 'user', result.rows[0].id);
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating user:', error);
@@ -128,6 +133,10 @@ router.put('/:id', isAdmin, async (req, res) => {
     queryParams.push(id);
 
     const result = await query(updateQuery, queryParams);
+    
+    // Log activity
+    await logActivity(pool, req.user.id, 'Update User', `Updated user: ${result.rows[0].username} (role: ${role}, active: ${is_active})`, 'user', parseInt(id));
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating user:', error);
@@ -155,10 +164,15 @@ router.delete('/:id', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
+    const username = existingUser.rows[0].username;
+
     await query(
       'UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [id]
     );
+
+    // Log activity
+    await logActivity(pool, req.user.id, 'Delete User', `Deactivated user: ${username}`, 'user', parseInt(id));
 
     res.json({ message: 'User deactivated successfully' });
   } catch (error) {

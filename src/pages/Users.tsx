@@ -14,7 +14,13 @@ const Users = ({ user: currentUser }: UsersProps) => {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    username: string;
+    password: string;
+    full_name: string;
+    role: 'admin' | 'cashier';
+    is_active: boolean;
+  }>({
     username: '',
     password: '',
     full_name: '',
@@ -170,7 +176,7 @@ const Users = ({ user: currentUser }: UsersProps) => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('userRole')}</label>
-                  <select className="form-select" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+                  <select className="form-select" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'cashier' })}>
                     <option value="cashier">{t('cashier')}</option>
                     <option value="admin">{t('admin')}</option>
                   </select>

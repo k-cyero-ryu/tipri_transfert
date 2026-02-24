@@ -15,9 +15,11 @@ const Sidebar = ({ user, onLogout, onLanguageChange }: SidebarProps) => {
     { path: '/', label: t('dashboard'), icon: '📊' },
     { path: '/transactions', label: t('transactions'), icon: '💸' },
     { path: '/accounts', label: t('accounts'), icon: '🏦' },
+    { path: '/clients', label: t('clients'), icon: '👤' },
     { path: '/users', label: t('users'), icon: '👥' },
     { path: '/reports', label: t('reports'), icon: '📈' },
     { path: '/settings', label: t('settings'), icon: '⚙️' },
+    { path: '/activity-log', label: t('activityLog'), icon: '📋' },
   ];
 
   const cashierLinks = [

@@ -136,6 +136,43 @@ export const initDatabase = async () => {
         days_overdue INTEGER NOT NULL,
         notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS clients (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) UNIQUE NOT NULL,
+        credit_limit DECIMAL(15,2) DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        action VARCHAR(100) NOT NULL,
+        details TEXT,
+        entity_type VARCHAR(50),
+        entity_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log(action);
+      CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);
+
+      CREATE TABLE IF NOT EXISTS account_transfer (
+        id SERIAL PRIMARY KEY,
+        from_account_id INTEGER REFERENCES accounts(id),
+        to_account_id INTEGER REFERENCES accounts(id),
+        from_currency VARCHAR(10) NOT NULL,
+        to_currency VARCHAR(10) NOT NULL,
+        send_amount DECIMAL(15,2) NOT NULL,
+        receive_amount DECIMAL(15,2) NOT NULL,
+        status VARCHAR(20) CHECK (status IN ('pending', 'completed', 'canceled')) DEFAULT 'pending',
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Insert default settings if not exist

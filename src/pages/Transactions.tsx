@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Transaction, Account } from '../types';
+import { User, Transaction, Account, Client } from '../types';
 import * as api from '../api';
 
 interface TransactionsProps {
@@ -11,6 +11,7 @@ const Transactions = ({ user }: TransactionsProps) => {
   const { t } = useTranslation();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -22,7 +23,19 @@ const Transactions = ({ user }: TransactionsProps) => {
     transactionStatus: '',
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    client_name: string;
+    payment_method: string;
+    payment_amount: number;
+    transaction_amount: number;
+    transaction_method: string;
+    transaction_details: string;
+    tax_rate: number;
+    is_credit: boolean;
+    credit_due_date: string;
+    sender_account_id: string;
+    receiver_account_id: string;
+  }>({
     client_name: '',
     payment_method: 'Cash',
     payment_amount: 0,
@@ -44,15 +57,18 @@ const Transactions = ({ user }: TransactionsProps) => {
 
   const loadData = async () => {
     try {
-      console.log('Loading transactions and accounts...');
-      const [txData, accData] = await Promise.all([
+      console.log('Loading transactions, accounts and clients...');
+      const [txData, accData, clientData] = await Promise.all([
         api.getTransactions(),
         api.getAccounts(),
+        api.getClients(),
       ]);
       console.log('Transactions loaded:', txData);
       console.log('Accounts loaded:', accData);
+      console.log('Clients loaded:', clientData);
       setTransactions(txData);
       setAccounts(accData);
+      setClients(clientData);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -91,8 +107,10 @@ const Transactions = ({ user }: TransactionsProps) => {
       setEditingTransaction(null);
       resetForm();
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving transaction:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to save transaction';
+      alert(errorMessage);
     }
   };
 
@@ -113,6 +131,9 @@ const Transactions = ({ user }: TransactionsProps) => {
   };
 
   const handleConfirmPayment = async (id: number) => {
+    if (!window.confirm(t('confirm') + '?')) {
+      return;
+    }
     try {
       await api.confirmPayment(id);
       loadData();
@@ -122,6 +143,9 @@ const Transactions = ({ user }: TransactionsProps) => {
   };
 
   const handleExecute = async (id: number) => {
+    if (!window.confirm(t('confirm') + '?')) {
+      return;
+    }
     try {
       await api.executeTransaction(id);
       loadData();
@@ -131,6 +155,9 @@ const Transactions = ({ user }: TransactionsProps) => {
   };
 
   const handleCancel = async (id: number) => {
+    if (!window.confirm(t('confirm') + '?')) {
+      return;
+    }
     try {
       await api.cancelTransaction(id);
       loadData();
@@ -270,7 +297,12 @@ const Transactions = ({ user }: TransactionsProps) => {
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label">{t('clientName')}</label>
-                  <input type="text" className="form-input" value={formData.client_name} onChange={(e) => setFormData({ ...formData, client_name: e.target.value })} required />
+                  <select className="form-select" value={formData.client_name} onChange={(e) => setFormData({ ...formData, client_name: e.target.value })} required>
+                    <option value="">-- Select --</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.name}>{client.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('paymentMethod')}</label>
