@@ -326,6 +326,19 @@ export const getReportTransactions = async (params?: { startDate?: string; endDa
   return res.json();
 };
 
+// Account Transactions Report
+export const getAccountTransactionsReport = async (params?: { startDate?: string; endDate?: string; accountId?: number; type?: string }) => {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.accountId) queryParams.append('accountId', params.accountId.toString());
+  if (params?.type) queryParams.append('type', params.type);
+  
+  const res = await fetch(`${API_URL}/reports/account-transactions?${queryParams}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch account transactions');
+  return res.json();
+};
+
 // Settings
 export const getSettings = async (): Promise<Settings[]> => {
   const res = await fetch(`${API_URL}/settings`, { headers: headers() });

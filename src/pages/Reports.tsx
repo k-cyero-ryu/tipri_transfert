@@ -35,6 +35,12 @@ const Reports = ({ user }: ReportsProps) => {
   const [withdrawalsReportData, setWithdrawalsReportData] = useState<any[]>([]);
   const [withdrawalsTransactions, setWithdrawalsTransactions] = useState<any[]>([]);
 
+  // Account Transactions data
+  const [accountTransactions, setAccountTransactions] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
+  const [selectedType, setSelectedType] = useState<string>('');
+
   useEffect(() => {
     if (user.role === 'admin') {
       loadReports();
@@ -80,6 +86,18 @@ const Reports = ({ user }: ReportsProps) => {
         
         setWithdrawalsReportData(report);
         setWithdrawalsTransactions(transactions);
+      } else if (activeTab === 'accountTransactions') {
+        // Load accounts for filter dropdown
+        const accountsData = await api.getAccounts();
+        setAccounts(accountsData);
+        
+        // Load account transactions
+        const accountTxParams: any = { ...filters };
+        if (selectedAccountId) accountTxParams.accountId = selectedAccountId;
+        if (selectedType) accountTxParams.type = selectedType;
+        
+        const transactions = await api.getAccountTransactionsReport(accountTxParams);
+        setAccountTransactions(transactions);
       }
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -148,6 +166,12 @@ const Reports = ({ user }: ReportsProps) => {
           onClick={() => handleTabChange('withdrawals')}
         >
           {t('withdrawalsReport')}
+        </button>
+        <button 
+          className={`tab ${activeTab === 'accountTransactions' ? 'active' : ''}`}
+          onClick={() => handleTabChange('accountTransactions')}
+        >
+          {t('accountTransactionsReport')}
         </button>
       </div>
 
@@ -413,6 +437,94 @@ const Reports = ({ user }: ReportsProps) => {
                             <td style={{ color: 'red', fontWeight: 'bold' }}>{formatCurrency(tx.amount, tx.account_currency)}</td>
                             <td>{tx.account_currency}</td>
                             <td>{tx.description}</td>
+                            <td>{formatDate(tx.created_at)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Account Transactions Report */}
+          {activeTab === 'accountTransactions' && (
+            <div>
+              <div className="report-filters" style={{ marginBottom: '20px' }}>
+                <div className="filters">
+                  <div className="filter-group">
+                    <label>{t('accountName')}:</label>
+                    <select 
+                      className="form-select" 
+                      value={selectedAccountId} 
+                      onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : '')}
+                    >
+                      <option value="">{t('all')}</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name} ({account.currency})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="filter-group">
+                    <label>{t('action')}:</label>
+                    <select 
+                      className="form-select" 
+                      value={selectedType} 
+                      onChange={(e) => setSelectedType(e.target.value)}
+                    >
+                      <option value="">{t('all')}</option>
+                      <option value="credit">Credit (+)</option>
+                      <option value="debit">Debit (-)</option>
+                    </select>
+                  </div>
+                  <button className="btn btn-primary" onClick={loadReports}>{t('generateReport')}</button>
+                </div>
+              </div>
+              
+              <div className="card">
+                <h3>{t('accountTransactionsReport')}</h3>
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>{t('accountName')}</th>
+                        <th>Type</th>
+                        <th>{t('amount')}</th>
+                        <th>Balance Before</th>
+                        <th>Balance After</th>
+                        <th>{t('details')}</th>
+                        <th>{t('dateTime')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accountTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="empty-state">{t('noData')}</td>
+                        </tr>
+                      ) : (
+                        accountTransactions.map((tx) => (
+                          <tr key={tx.id}>
+                            <td>{tx.id}</td>
+                            <td>{tx.account_name} ({tx.account_currency})</td>
+                            <td style={{ 
+                              color: tx.type === 'credit' ? 'green' : 'red', 
+                              fontWeight: 'bold' 
+                            }}>
+                              {tx.type === 'credit' ? '+' : '-'}{tx.type.toUpperCase()}
+                            </td>
+                            <td style={{ 
+                              color: tx.type === 'credit' ? 'green' : 'red', 
+                              fontWeight: 'bold' 
+                            }}>
+                              {formatCurrency(tx.amount, tx.account_currency)}
+                            </td>
+                            <td>{formatCurrency(tx.balance_before, tx.account_currency)}</td>
+                            <td>{formatCurrency(tx.balance_after, tx.account_currency)}</td>
+                            <td>{tx.description || (tx.transaction_client ? `Transaction: ${tx.transaction_client}` : '-')}</td>
                             <td>{formatDate(tx.created_at)}</td>
                           </tr>
                         ))

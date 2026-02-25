@@ -97,6 +97,11 @@ const resources = {
       isCredit: 'Credit Transaction',
       creditDueDate: 'Due Date',
       creditPaid: 'Credit Paid',
+      paymentDetails: 'Payment Details',
+      sendMoney: 'Send Money',
+      senderInfo: 'Sender Information',
+      notAssigned: 'Not Assigned',
+      createdAt: 'Created At',
       
       // Users
       fullName: 'Full Name',
@@ -113,6 +118,7 @@ const resources = {
       profitReport: 'Profit',
       costReport: 'Cost',
       withdrawalsReport: 'Withdrawals',
+      accountTransactionsReport: 'Account Transactions',
       resumeReport: 'Resume',
       summary: 'Summary',
       transactionsReport: 'Transactions',
@@ -256,6 +262,11 @@ const resources = {
       isCredit: 'Transaction à crédit',
       creditDueDate: "Date d'échéance",
       creditPaid: 'Crédit payé',
+      paymentDetails: 'Détails du paiement',
+      sendMoney: 'Envoyer l\'argent',
+      senderInfo: 'Informations de l\'expéditeur',
+      notAssigned: 'Non assigné',
+      createdAt: 'Créé le',
       
       // Users
       fullName: 'Nom complet',
@@ -272,6 +283,7 @@ const resources = {
       profitReport: 'Profit',
       costReport: 'Coût',
       withdrawalsReport: 'Retraits',
+      accountTransactionsReport: 'Transactions de compte',
       resumeReport: 'Résumé',
       summary: 'Résumé',
       transactionsReport: 'Transactions',

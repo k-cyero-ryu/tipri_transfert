@@ -1,20 +1,126 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Load the appropriate .env file based on NODE_ENV
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: '.env.production' });
+} else {
+  dotenv.config();
+}
 
 const { Pool } = pg;
 
-// First try to create the database if it doesn't exist
-export const initDbName = async () => {
+// Check if we're using DATABASE_URL (production) or individual env vars (development)
+const useDatabaseUrl = process.env.DATABASE_URL && process.env.NODE_ENV === 'production';
+
+// Parse DATABASE_URL for production
+const parseDatabaseUrl = (url) => {
   try {
-    const adminPool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: 'postgres',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-    });
+    // Match user:password@host:port/database?options
+    const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)(\?.*)?$/);
+    if (match) {
+      const dbName = match[5].split('/').pop(); // Get the last part after any slashes
+      const options = match[6] || ''; // Get the query string if present
+      const sslmode = options.includes('sslmode=require') || options.includes('sslmode=verify-full') 
+        ? { rejectUnauthorized: false }
+        : options.includes('sslmode=disable')
+          ? false
+          : process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false;
+      
+      return {
+        user: match[1],
+        password: match[2],
+        host: match[3],
+        port: parseInt(match[4]),
+        database: dbName,
+        sslmode: sslmode
+      };
+    }
+  } catch (e) {
+    console.error('Error parsing DATABASE_URL:', e.message);
+  }
+  return null;
+};
+
+// Get pool config based on environment
+const getPoolConfig = () => {
+  const config = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'tipri_transfert',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+  };
+  
+  let parsedSSL = false;
+  
+  if (useDatabaseUrl) {
+    const parsed = parseDatabaseUrl(process.env.DATABASE_URL);
+    if (parsed) {
+      config.host = parsed.host;
+      config.port = parsed.port;
+      config.database = parsed.database;
+      config.user = parsed.user;
+      config.password = parsed.password;
+      if (parsed.sslmode) {
+        config.ssl = parsed.sslmode;
+        parsedSSL = true;
+      }
+    }
+  }
+  
+  // Apply SSL settings if DATABASE_SSL is true and not already set from URL
+  if (!parsedSSL && process.env.DATABASE_SSL === 'true') {
+    config.ssl = { rejectUnauthorized: false };
+  }
+  
+  return config;
+};
+
+// Get admin pool config (for creating database)
+const getAdminPoolConfig = () => {
+  const config = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: 'postgres',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+  };
+  
+  let parsedSSL = false;
+  
+  if (useDatabaseUrl) {
+    const parsed = parseDatabaseUrl(process.env.DATABASE_URL);
+    if (parsed) {
+      config.host = parsed.host;
+      config.port = parsed.port;
+      config.user = parsed.user;
+      config.password = parsed.password;
+      if (parsed.sslmode) {
+        config.ssl = parsed.sslmode;
+        parsedSSL = true;
+      }
+    }
+  }
+  
+  // Apply SSL settings if DATABASE_SSL is true and not already set from URL
+  if (!parsedSSL && process.env.DATABASE_SSL === 'true') {
+    config.ssl = { rejectUnauthorized: false };
+  }
+  
+  return config;
+};
+
+// First try to create the database if it doesn't exist (only in development)
+export const initDbName = async () => {
+  // Skip database creation in production - database already exists
+  if (useDatabaseUrl) {
+    console.log('Production mode: Using existing database');
+    return;
+  }
+  
+  try {
+    const adminPool = new Pool(getAdminPoolConfig());
     
     const result = await adminPool.query(
       "SELECT 1 FROM pg_database WHERE datname = $1",
@@ -34,13 +140,7 @@ export const initDbName = async () => {
   }
 };
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'tipri_transfert',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-});
+const pool = new Pool(getPoolConfig());
 
 export const query = async (text, params) => {
   const client = await pool.connect();

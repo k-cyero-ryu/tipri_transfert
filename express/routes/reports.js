@@ -482,4 +482,65 @@ router.get('/transactions', authenticate, isAdmin, async (req, res) => {
   }
 });
 
+// Get account transactions (balance changes from account_transactions table)
+router.get('/account-transactions', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { startDate, endDate, accountId, type } = req.query;
+    
+    let queryStr = `
+      SELECT 
+        at.id,
+        at.account_id,
+        at.transaction_id,
+        at.type,
+        at.amount,
+        at.balance_before,
+        at.balance_after,
+        at.description,
+        at.created_at,
+        a.name as account_name,
+        a.currency as account_currency,
+        t.client_name as transaction_client,
+        t.payment_method,
+        t.payment_amount,
+        t.transaction_amount
+      FROM account_transactions at
+      INNER JOIN accounts a ON at.account_id = a.id
+      LEFT JOIN transactions t ON at.transaction_id = t.id
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+    
+    if (startDate) {
+      queryParams.push(startDate);
+      queryStr += ` AND at.created_at >= $${queryParams.length}`;
+    }
+    
+    if (endDate) {
+      queryParams.push(endDate);
+      queryStr += ` AND at.created_at <= $${queryParams.length}`;
+    }
+    
+    if (accountId) {
+      queryParams.push(accountId);
+      queryStr += ` AND at.account_id = $${queryParams.length}`;
+    }
+    
+    if (type === 'debit') {
+      queryStr += ` AND at.type = 'debit'`;
+    } else if (type === 'credit') {
+      queryStr += ` AND at.type = 'credit'`;
+    }
+    
+    queryStr += ' ORDER BY at.created_at DESC';
+    
+    const result = await query(queryStr, queryParams);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching account transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

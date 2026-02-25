@@ -14,6 +14,8 @@ const Transactions = ({ user }: TransactionsProps) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [detailsTransaction, setDetailsTransaction] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
   const [filters, setFilters] = useState({
@@ -243,8 +245,8 @@ const Transactions = ({ user }: TransactionsProps) => {
                   <td colSpan={9} className="empty-state">{t('noData')}</td>
                 </tr>
               ) : (
-                transactions.map((tx) => (
-                  <tr key={tx.id}>
+              transactions.map((tx) => (
+                  <tr key={tx.id} onClick={() => { setDetailsTransaction(tx); setShowDetailsModal(true); }} style={{ cursor: 'pointer' }}>
                     <td>{tx.id}</td>
                     <td>{tx.client_name}</td>
                     <td>{tx.payment_method}</td>
@@ -261,7 +263,7 @@ const Transactions = ({ user }: TransactionsProps) => {
                         {t(tx.transaction_status)}
                       </span>
                     </td>
-                    <td className="table-actions">
+                    <td className="table-actions" onClick={(e) => e.stopPropagation()}>
                       {tx.payment_status === 'pending' && (
                         <button className="btn btn-success btn-sm" onClick={() => handleConfirmPayment(tx.id)}>
                           {t('confirmPayment')}
@@ -372,6 +374,113 @@ const Transactions = ({ user }: TransactionsProps) => {
                 <button type="submit" className="btn btn-primary">{t('save')}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDetailsModal && detailsTransaction && (
+        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">{t('transactionDetails')}</h2>
+              <button className="modal-close" onClick={() => setShowDetailsModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row">
+                <span className="detail-label">{t('clientName')}:</span>
+                <span className="detail-value">{detailsTransaction.client_name}</span>
+              </div>
+              <div className="detail-section">
+                <h3 className="detail-section-title">{t('paymentDetails')}</h3>
+                <div className="detail-row">
+                  <span className="detail-label">{t('paymentMethod')}:</span>
+                  <span className="detail-value">{detailsTransaction.payment_method}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">{t('paymentAmount')}:</span>
+                  <span className="detail-value">{formatCurrency(detailsTransaction.payment_amount)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">{t('paymentStatus')}:</span>
+                  <span className={`badge badge-${detailsTransaction.payment_status}`}>
+                    {t(detailsTransaction.payment_status)}
+                  </span>
+                </div>
+              </div>
+              <div className="detail-section">
+                <h3 className="detail-section-title">{t('sendMoney')}</h3>
+                <div className="detail-row">
+                  <span className="detail-label">{t('transactionMethod')}:</span>
+                  <span className="detail-value">{detailsTransaction.transaction_method}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">{t('transactionAmount')}:</span>
+                  <span className="detail-value">{formatCurrency(detailsTransaction.transaction_amount)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">{t('receiverAccount')}:</span>
+                  <span className="detail-value">
+                    {detailsTransaction.receiver_account_name || t('notAssigned')}
+                    {detailsTransaction.receiver_currency ? ` (${detailsTransaction.receiver_currency})` : ''}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">{t('taxRate')}:</span>
+                  <span className="detail-value">{detailsTransaction.tax_rate}</span>
+                </div>
+                {detailsTransaction.transaction_details && (
+                  <div className="detail-row">
+                    <span className="detail-label">{t('transactionDetails')}:</span>
+                    <span className="detail-value">{detailsTransaction.transaction_details}</span>
+                  </div>
+                )}
+                <div className="detail-row">
+                  <span className="detail-label">{t('transactionStatus')}:</span>
+                  <span className={`badge badge-${detailsTransaction.transaction_status}`}>
+                    {t(detailsTransaction.transaction_status)}
+                  </span>
+                </div>
+              </div>
+              {detailsTransaction.sender_account_id && (
+                <div className="detail-section">
+                  <h3 className="detail-section-title">{t('senderInfo')}</h3>
+                  <div className="detail-row">
+                    <span className="detail-label">{t('senderAccount')}:</span>
+                    <span className="detail-value">
+                      {detailsTransaction.sender_account_name || t('notAssigned')}
+                      {detailsTransaction.sender_currency ? ` (${detailsTransaction.sender_currency})` : ''}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {detailsTransaction.is_credit && (
+                <div className="detail-section">
+                  <div className="detail-row">
+                    <span className="detail-label">{t('isCredit')}:</span>
+                    <span className="detail-value">{t('yes')}</span>
+                  </div>
+                  {detailsTransaction.credit_due_date && (
+                    <div className="detail-row">
+                      <span className="detail-label">{t('creditDueDate')}:</span>
+                      <span className="detail-value">{formatDate(detailsTransaction.credit_due_date)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="detail-row">
+                <span className="detail-label">ID:</span>
+                <span className="detail-value">#{detailsTransaction.id}</span>
+              </div>
+              {detailsTransaction.created_at && (
+                <div className="detail-row">
+                  <span className="detail-label">{t('createdAt')}:</span>
+                  <span className="detail-value">{formatDate(detailsTransaction.created_at)}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowDetailsModal(false)}>{t('close')}</button>
+            </div>
           </div>
         </div>
       )}

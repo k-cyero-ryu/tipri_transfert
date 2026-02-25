@@ -1,7 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { initDatabase, initDbName } from './db.js';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import accountRoutes from './routes/accounts.js';
@@ -14,7 +20,15 @@ import accountTransferRoutes from './routes/accountTransfer.js';
 import clientRoutes from './routes/clients.js';
 import activityLogRoutes from './routes/activityLog.js';
 
-dotenv.config();
+console.log('before load',process.env.NODE_ENV);
+// Load the appropriate .env file based on NODE_ENV
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: '.env.production' });
+} else {
+  dotenv.config();
+}
+
+console.log('after load',process.env.NODE_ENV);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,6 +54,19 @@ app.use('/api/activity-log', activityLogRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  
+  // Handle React routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
